@@ -1,6 +1,6 @@
 # Holo9 Weather - Internet Weather Station for the ESP32-S3 with 3.5" Display
 
-![Holo9 Weather Display](https://github.com/holo9-code/holo9_weather/blob/main/pics/Holo9_3DPrint_800.jpg)
+![Holo9 Weather Display](https://github.com/holo9-code/Holo9-Weather/blob/main/pics/Holo9_3DPrint_800.jpg)
 
 ---
 
@@ -36,7 +36,7 @@ The interface is designed to be simple, intuitive, and visually appealing, with 
 
 ## 🖥️ Hardware
 
-You won`t need much for this project. It does not involve any soldering or even connecting external sensors. The ESP32S3 with display is fully (well kind of, it helps to have a USB connection for power and Wifi) self sufficient. The display is already connected to the ESP32 and once set up all interaction happens through   
+You won`t need much for this project. It does not involve any soldering or even connecting external sensors. The ESP32S3 with display is fully (well kind of, it helps to have a USB connection for power and Wifi) self sufficient. The display is already connected to the ESP32 and once set up all interaction happens through the capacitive touch screen.  
 
 ### Here is what you need:
 
