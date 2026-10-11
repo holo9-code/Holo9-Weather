@@ -42,9 +42,9 @@ You won`t need much for this project. It does not involve any soldering or even 
 
 Essentially this is a one item shopping list:
 
-- ###### [Your ESP32-S3 with 3.5" 320 × 480, QSPI capacitive touch screen (using an ST77922 controller)](https://link.amazon/B0hpUn6v9)
+- ##### [Your ESP32-S3 with 3.5" 320 × 480, QSPI capacitive touch screen (using an ST77922 controller)](https://link.amazon/B0hpUn6v9)
 
-  This is a roughly USD/EUR 25 development board sold under a number of different brand names (Elecrow, Hosyond...). Why this one? This is essentially a CYD on steroids for just a few bucks more, still ultra compact but much better and slightly bigger screen, QSPI display with capacitive touch, way more RAM, more power... 
+  This is a roughly USD/EUR 25 development board sold under a number of different brand names (Elecrow, Hosyond...). Why this one? This is essentially a CYD on steroids for just a few bucks more, still ultra compact but much better and slightly bigger screen, QSPI display with capacitive touch and a modern ST77922 controller, way more RAM, more power... 
 
   Make sure you get the 3.5" (not 2.8") version. It is a black (unlike CYDs) development board. Look out for the "3.5" LCD Display ESP32-S3 320x480 Capacitive Touch" label on its back. I found it on the US Amazon website as "Hosyond ESP32-S3 Touchscreen Module, 3.5" 240x320 IPS LCD EPS32 Display", which is simply wrong (as it is 320x480) but should nevertheless be the one you are looking for.
 
@@ -60,13 +60,13 @@ Essentially this is a one item shopping list:
 
 
 
-
+Here the full specs, documentation, pinout etc:  https://www.lcdwiki.com/3.5inch_ESP32-S3_Display
 
 **ESP32-S3 Microcontroller**
 
 - Dual-core Xtensa LX7 processor running at 240 MHz
-- 8 MB PSRAM and 8 MB flash memory
-- WiFi 4 (802.11n) and Bluetooth 5.0
+- 384 KB ROM + 512KB SRAM + 16 KB RTC SRAM + 8M OPI PSRAM + 16M QSPI Flash
+- WiFi 4 (802.11n). 2.4GHz and Bluetooth 5.0
 - Native USB-C connectivity
 - Low power consumption with multiple sleep modes
 
@@ -78,26 +78,21 @@ Essentially this is a one item shopping list:
 - QSPI interface for fast data transfer
 - IPS panel with wide viewing angles
 
-**Additional Features**
 
-- Built-in RGB LED indicator
-- MicroSD card slot (unused in current firmware)
-- Onboard speaker (unused in current firmware)
-- Battery charging circuit (unused in current firmware)
 
 ---
 
 ## 💻 Software & Code
 
-### Architecture Overview
+### Adressing that ST77922 Screen:
 
-Holo9 Weather is built on the Arduino framework with several key components:
+If you have been playing around with the ESP32 (e.g. with the CYD) things like TFT_eSPI.h (Thx to Bodmer for this wonderful lib) will instantly look familiar. However, since this board is using a modern QSPI interface and an ST77922 screen, which are not supported, you can`t directly write to the screen. Instead you write to an off-screen frame buffer (TFT_eSprite canvas) and then push the sprite buffer to the physical QSPI display using the provided ST77922 driver. Sounds slightly complicated (and took me some time to find out) but ultimately a very simple concept, which allows you to use the full power of theTFT_eSPI library.
 
-#### Core Components:
+#### A Few More Components:
 
-- **Open-Meteo API Integration**: Fetches weather data from [open-meteo.com](https://open-meteo.com), a free weather API that provides global forecast data
-- **Vector Graphics Engine**: Uses OpenFontRender for crisp, scalable text rendering
-- **Custom Display Drivers**: ST77922 driver for the QSPI display and ST77922_Touch for capacitive touch
+- **Open-Meteo API Integration**: Fetches weather data from [open-meteo.com](https://open-meteo.com) in Switzerland, a free weather API that provides global forecast data and multiple models
+- **Fonts**: Uses OpenFontRender for scalable text rendering
+- **Custom Display Drivers**: ST77922 driver for the QSPI display and ST77922_Touch for capacitive touch. Very basic drivers essentially just used to push the data from the frame-buffer to the screen
 - **Preferences System**: Persistent storage of settings using the ESP32's Preferences library
 
 #### Weather Data Structure:
@@ -108,15 +103,26 @@ The code fetches and stores:
 - **Hourly forecast**: 120 hours of temperature, precipitation, and weather codes
 - **Daily forecast**: 10 days of high/low temperatures, precipitation, and weather codes
 
+#### Weather Model Selection (in Settings):
+
+- **best_match**: Automatically selects the best available model. This works really well for most instances
+- **icon_seamless**: DWD (German Meteorological Service) model, global, particularly good for Europe
+- **geosphere_seamless**: High-resolution global model focus on Central Europe
+- **ecmwf_ifs04**: European Centre for Medium-Range Weather Forecasts model
+- **gfs_seamless**: Global Forecast System by the US NWS
+
 #### User Interface:
 
-Five rotating screens provide different views:
+Four rotating screens provide different views. Tap on the screen anywhere outside the lower right corner to get to the next screen.
 
 1. **Current Weather**: Main dashboard with current conditions
 2. **Sense Clock**: Large clock with weather summary
 3. **72-Hour Forecast**: Hourly temperature and precipitation trends
 4. **10-Day Forecast**: Daily high/low temperatures with weather icons
-5. **Settings**: Configuration for location, weather model, units, and WiFi
+
+Tap the lower right corner to reach
+
+1. **Settings**: Configuration for location, weather model, units, and WiFi. These are all hard coded in the 
 
 #### Key Features:
 
@@ -124,7 +130,7 @@ Five rotating screens provide different views:
 - **Timezone support**: Automatic timezone adjustment based on location
 - **Unit conversion**: Toggle between metric (°C, km/h, mm) and imperial (°F, mph, in)
 - **Multiple weather models**: Choose from best_match, icon_seamless, geosphere_seamless, ecmwf_ifs04, or gfs_seamless
-- **Touch navigation**: Simple tap to cycle through screens
+- **Touch navigation**: Simple tap to cycle through screens, no external connections
 
 ---
 
@@ -132,27 +138,14 @@ Five rotating screens provide different views:
 
 ### Required Tools & Libraries
 
-#### Hardware Setup:
-
-1. **ESP32-S3 board** with 8MB PSRAM and 8MB flash
-2. **3.5" ST77922 QSPI display** (the one from [lcdwiki.com](https://www.lcdwiki.com/3.5inch_ESP32-S3_Display))
-3. **USB-C cable** for programming and power
-4. **WiFi network** (2.4GHz recommended)
+It should essentially be very simple. Connect your ESP32 board to your computer via the cable that came with the board. 
 
 #### Software Requirements:
 
 - **Arduino IDE** (2.3.2 or later recommended)
 - **ESP32 Arduino Core** (version 3.0.0 or later)
-- **Required Libraries** (install via Library Manager or GitHub):
-  - `WiFi` (built-in)
-  - `HTTPClient` (built-in)
-  - `ArduinoJson` (by Benoit Blanchon, version 6.x)
-  - `TFT_eSPI` (by Bodmer, version 2.x)
-  - `Preferences` (built-in)
-  - `OpenFontRender` (by takkaO)
-  - `ST77922` (custom library for your display)
-  - `ST77922_Touch` (custom library for touch interface)
-  - `PlusJakarta` (embedded TTF font)
+
+  
 
 #### Arduino IDE Configuration:
 
@@ -165,7 +158,14 @@ Five rotating screens provide different views:
    - Add this URL to "Additional Boards Manager URLs":
 
      ```
-     https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
+     Hardware Setup:
+     **ESP32-S3 board** with 8MB PSRAM and 8MB flash
+     
+     **3.5" ST77922 QSPI display** (the one from [lcdwiki.com](https://www.lcdwiki.com/3.5inch_ESP32-S3_Display))
+     
+     **USB-C cable** for programming and power
+     
+     **WiFi network** (2.4GHz recommended)https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
      ```
 
    - Go to **Tools > Board > Boards Manager**
@@ -187,21 +187,28 @@ Five rotating screens provide different views:
    - For custom libraries (ST77922, ST77922_Touch):
      - Place them in your Arduino libraries folder
      - Or use **Sketch > Add .ZIP Library**
+- **Required Libraries** (install via Library Manager or GitHub):
+  - `WiFi` (built-in)
+  - `HTTPClient` (built-in)
+  - `ArduinoJson` (by Benoit Blanchon, version 6.x)
+  - `TFT_eSPI` (by Bodmer, version 2.x)
+  - `Preferences` (built-in)
+  - `OpenFontRender` (by takkaO)
+  - `ST77922` (custom library for your display)
+  - `ST77922_Touch` (custom library for touch interface)
+  - `PlusJakarta` (embedded TTF font - place PlusJakarta.h in the same directory as the code)
 
 ### Flashing the Firmware
 
 1. **Download the Code**:
 
-   ```bash
-   git clone https://github.com/yourusername/Holo9_Weather.git
-   cd Holo9_Weather
-   ```
+   
 
 2. **Configure WiFi**:
 
-   - Open `Holo9_Weather.ino` in Arduino IDE
+   - Open `.ino` in Arduino IDE
 
-   - Edit the `WIFI_PRESETS` array in the code:
+   - Edit the `WIFI_PRESETS` array in the code. Most of the time you will just need one, so this is in case you keep moving your ESP:
 
      ```cpp
      const WifiCredential WIFI_PRESETS[] = {
@@ -224,10 +231,10 @@ Five rotating screens provide different views:
      };
      ```
 
-   - Example:
+   - The easiest way to find your exact location is to look it up in Google Maps, then right click and get the location data. To get the full data with timezone and posix string copy one of the locations and ask Google to give you the exact same infor for your location.
 
      ```cpp
-     {"Mariabrunn, Vienna", 48.20695487974676, 16.22939762373813, "Europe%2FVienna", "CET-1CEST,M3.5.0,M10.5.0/3"}
+     {"Mariabrunn, Vienna", 48.207, 16.229, "Europe%2FVienna", "CET-1CEST,M3.5.0,M10.5.0/3"}
      ```
 
 4. **Upload the Code**:
@@ -242,6 +249,16 @@ Five rotating screens provide different views:
    - The display will show a splash screen while connecting to WiFi
    - After successful connection, weather data will be fetched and displayed
    - If WiFi connection fails, the device will retry automatically
+   - If you get stuck somewhere, check all your data and reflash
+   - Tap the lower right corner on any page, choose your location, preferred forecast model, and imperial/metric and click exit. These values will be stored even if you power down.
+
+   ###### Settings:
+
+   - **Location**: Choose from predefined cities or add your own coordinates
+   - **Model**: Select weather model (best_match typically gives good results)
+   - **WiFi**: Choose from up to 3 saved WiFi networks
+   - **Units**: Toggle between metric and imperial units
+   - Settings will be saved on exit
 
 ---
 
@@ -286,12 +303,7 @@ Simply **tap the settings icon** in the bottom-right corner to cycle through the
    - Save settings and reconnect to WiFi
    - All settings are saved to persistent storage
 
-### Settings Explained:
-
-- **Location**: Choose from predefined cities or add your own coordinates
-- **Model**: Select weather model (best_match typically gives good results)
-- **WiFi**: Choose from up to 3 saved WiFi networks
-- **Units**: Toggle between metric and imperial units
+### 
 
 ---
 
@@ -317,44 +329,25 @@ Simply **tap the settings icon** in the bottom-right corner to cycle through the
 - **ecmwf_ifs04**: European Centre for Medium-Range Weather Forecasts
 - **gfs_seamless**: Global Forecast System (US)
 
-### Troubleshooting:
 
-- **WiFi Connection Issues**: Check your SSID and password, ensure 2.4GHz network
-- **Display Not Working**: Verify QSPI wiring, check display initialization
-- **Touch Not Responding**: Ensure touch driver is properly initialized
-- **Weather Data Not Updating**: Check internet connection, verify API endpoint
 
-### Enhancement Ideas:
 
-- Add local sensor support (temperature, humidity, pressure)
-- Implement MQTT for IoT integration
-- Add weather alerts/notifications
-- Create custom weather icons
-- Add moon phase display
-- Implement a screensaver mode
 
 ---
 
-## 📜 License
+## 📜 Licenses and Credits
 
-Holo9 Weather is open source software released under the **MIT License**.
+I greatly appreciate all the hard work done by other people this app is built on.
 
-The weather icons and fonts are used under their respective licenses:
-
-- Weather icons: Custom vector art
-- Plus Jakarta font: SIL Open Font License
-- OpenFontRender library: FTL License
+- Weather data: [Open-Meteo](https://open-meteo.com/) (free for non-commercial use, [attribution required](https://open-meteo.com/en/license))
+- [TFT_eSPI](https://github.com/Bodmer/TFT_eSPI) by Bodmer (FreeBSD)
+- [OpenFontRender](https://github.com/takkaO/OpenFontRender) by takkaO (FTL)
+- [Plus Jakarta Sans](https://github.com/tokotype/PlusJakartaSans) by Tokotype (SIL OFL)
+- Holo9 Weather © 2026 Harald Noedl, released under the **MIT License**
 
 ---
 
-## 🤝 Contributing
 
-Contributions are welcome! Feel free to:
-
-- Report bugs and suggest features by opening an issue
-- Submit pull requests for improvements
-- Share your build photos and modifications
-- Help improve documentation
 
 ---
 
