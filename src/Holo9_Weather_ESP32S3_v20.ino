@@ -98,8 +98,8 @@ struct LocationPreset {
 const LocationPreset LOCATIONS[] = {
     {"Mariabrunn, Vienna", 48.20695487974676, 16.22939762373813, "Europe%2FVienna",   "CET-1CEST,M3.5.0,M10.5.0/3"},
     {"Graz, Austria",      47.07083,          15.43861,           "Europe%2FVienna",   "CET-1CEST,M3.5.0,M10.5.0/3"},
-   // {"Paris, France",      48.85661,          2.35222,            "Europe%2FParis" ,   "CET-1CEST,M3.5.0,M10.5.0/3"},
-   // {"Berlin, Germany",    52.52000,          13.40500,           "Europe%2FBerlin",   "CET-1CEST,M3.5.0,M10.5.0/3"},
+    {"Paris, France",      48.85661,          2.35222,            "Europe%2FParis" ,   "CET-1CEST,M3.5.0,M10.5.0/3"},
+    {"Berlin, Germany",    52.52000,          13.40500,           "Europe%2FBerlin",   "CET-1CEST,M3.5.0,M10.5.0/3"},
     {"Nuuk, Greenland",    64.17451,          -51.73844,          "America%2FNuuk",    "WGT2WGST,M3.5.0,M10.5.0/3"},
     {"Bangkok, Thailand",  13.75633,          100.50177,          "Asia%2FBangkok",    "ICT-7"},
     {"New York, USA",      40.71280,          -74.0060,           "America%2FNew_York","EST5EDT,M3.2.0,M11.1.0"}
