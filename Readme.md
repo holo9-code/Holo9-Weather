@@ -30,7 +30,7 @@ Whether you're a weather enthusiast, a maker looking for a practical ESP32 proje
 
     ![Holo9 Weather Display](https://github.com/holo9-code/Holo9-Weather/blob/main/pics/Holo9_ScreenSett_640.jpg)
 
-The interface is designed to be simple, intuitive, and visually appealing, with smooth vector graphics using the full 320*480 resolution and a dark theme that's easy on the eyes.
+I tried to keep the interface simple, intuitive, and visually appealing, with smooth vector graphics using the full 320*480 resolution and a dark theme that's easy on the eyes.
 
 ---
 
@@ -40,7 +40,27 @@ You won`t need much for this project. It does not involve any soldering or even 
 
 ### Here is what you need:
 
- ![Holo9 Weather Display](https://github.com/holo9-code/Holo9-Weather/blob/main/pics/ESP32S3with35Display_640.jpg)
+Essentially this is a one item shopping list:
+
+- ###### [Your ESP32-S3 with 3.5" 320 × 480, QSPI capacitive touch screen (using an ST77922 controller)](https://link.amazon/B0hpUn6v9)
+
+  This is a roughly USD/EUR 25 development board sold under a number of different brand names (Elecrow, Hosyond...). Why this one? This is essentially a CYD on steroids for just a few bucks more, still ultra compact but much better and slightly bigger screen, QSPI display with capacitive touch, way more RAM, more power... 
+
+  Make sure you get the 3.5" (not 2.8") version. It is a black (unlike CYDs) development board. Look out for the "3.5" LCD Display ESP32-S3 320x480 Capacitive Touch" label on its back. I found it on the US Amazon website as "Hosyond ESP32-S3 Touchscreen Module, 3.5" 240x320 IPS LCD EPS32 Display", which is simply wrong (as it is 320x480) but should nevertheless be the one you are looking for.
+
+  
+
+  ![ESP32 Back](https://github.com/holo9-code/Holo9-Weather/blob/main/pics/ESP32S3Back_640.jpg)
+
+  
+
+  It comes with a built in SD-card reader, microphone, external speaker (which we all won`t be using) and an USB-A to USB-C cable (which WILL be using), built in Wifi and BT and battery charging circuit (nice if you want to add a battery)
+
+  ![Holo9 Weather Display](https://github.com/holo9-code/Holo9-Weather/blob/main/pics/ESP32S3with35Display_640.jpg)
+
+
+
+
 
 **ESP32-S3 Microcontroller**
 
