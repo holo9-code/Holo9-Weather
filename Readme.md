@@ -226,7 +226,7 @@ It should essentially be very simple. Connect your ESP32 board to your computer 
    - If you get stuck somewhere, check all your data and reflash
    - Tap the lower right corner on any page, choose your location, preferred forecast model, and imperial/metric and click exit. These values will be stored even if you power down.
 
-6. **Settings** 🛠️:
+6. **Settings** :
 
    - **Location**: Choose from predefined cities or add your own coordinates
    - **Model**: Select weather model (best_match typically gives good results, see above for details)
@@ -236,11 +236,23 @@ It should essentially be very simple. Connect your ESP32 board to your computer 
 
 ---
 
-##  Tips & Recommendations
+### 🛠️ Printing and Assembling the Enclosure:
+
+The .stl files are in the 3D_stl directory. All files and instructions on the my Printables page at https://www.printables.com/model/1888752-esp32-s3-35-development-board-case-holo9-weather-s
+
+![Holo9 Weather 3D](https://github.com/holo9-code/Holo9-Weather/blob/main/pics/Holo9Weather_FreeCAD.jpg)
+
+Hand-crafted on FreeCAD (like all my other designs - thx to the makers) this should be an easy and fast print. With one minor exception (the opening for the USB port at the side of the main body) you will not need any supports. 
+
+Filament. I used dark gray PLA for the front and foot and light blue for the main body. Looks really nice but feel free to use any color and material you like.
+
+Printing. I use 3 bottom layers, 3 walls, and 30% infill but essentially whatever your standard settings are will likely work. Turn the front so that the outside is at the bottom and the foot so that it stands upright. Supports only on the side opening of the main body.
+
+Assembly. 1.) Mount the ESP32 board to the front cover (there are 4 little notches that should perfectly fit the screw holes of the board - either add a small drop of glue to each of these or use a soldering iron to flatten the notches). 2.) Mount the main body to the front with 4 small screws (I use 3 x 15mm wood screws but any short M3 screw will do or you can just glue it) 3.) Mount the foot to the back of the main body with 3 of the same screws. Plug the USB cable in and you should be ready to go.
 
 ---
 
-## 📜 Licenses and Credits 📚
+### 📜 Licenses and Credits 📚
 
 Thanks to all the folks who contributed to this project (without knowing):
 
