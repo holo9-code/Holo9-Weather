@@ -1,5 +1,5 @@
 /**
- * Holo9 Weather v2.0 for 3.5" ESP32-S3 + ST77922 QSPI Display
+ * Holo9 Weather V2.23 for 3.5" ESP32-S3 + ST77922 QSPI Display
  * Copyright (c) 2026 Harald Noedl MIT License.
  */
 
@@ -7,7 +7,11 @@
 #include "WiFi.h"
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
-#include <TFT_eSPI.h>    // Copyright (c) 2026 Bodmer FreeBSD License
+#include <FS.h>
+using namespace fs;
+#include <WebServer.h>
+#include <ElegantOTA.h>        // Copyright Ayush Sharma 2026 AGPL-3.0 License
+#include <TFT_eSPI.h>          // Copyright (c) 2026 Bodmer FreeBSD License
 #include "time.h"
 #include <Preferences.h>
 
@@ -15,6 +19,7 @@
 #include "ST77922_Touch.h"     // Custom capacitive touch driver
 #include <OpenFontRender.h>    // Vector font engine *** Copyright (c) takkaO FTL License ***
 #include "PlusJakarta.h"       // Embedded TTF  *** Copyright (c) Tokotype SIL Open Font License ***
+#include "Holo9Presets.h"      // Load Presets (WIFI, Locations, Models etc)
 
 #define OFR_FONT_ARRAY PlusJakarta_min_ttf
 #define OFR_FONT_SIZE  PlusJakarta_min_ttf_len
@@ -27,6 +32,22 @@ TFT_eSPI tft = TFT_eSPI();
 TFT_eSprite canvas = TFT_eSprite(&tft);   // Off-screen frame buffer
 ST77922_TOUCH touch;
 OpenFontRender ofr;
+WebServer server(80);
+static bool otaServerStarted = false;
+
+// Start ElegantOTA only after WiFi is connected. The guard keeps reconnects
+// and settings changes from registering the web server more than once.
+void startOTAServer() {
+    if (otaServerStarted || WiFi.status() != WL_CONNECTED) {
+        return;
+    }
+    ElegantOTA.begin(&server, OTA_USERNAME, OTA_PASSWORD);
+    server.begin();
+    otaServerStarted = true;
+    Serial.print("OTA: http://");
+    Serial.print(WiFi.localIP());
+    Serial.println("/update");
+}
 
 // Push the sprite buffer to the physical QSPI display
 void pushCanvas() {
@@ -50,14 +71,6 @@ void pushCanvas() {
 #define MY_GREY03     0x734B
 #define MY_LIGHTGREY  0xBDD4
 #define MY_RED        0xC800
-
-// ============================================================
-// GRAPH TEMPERATURE SCALE (fixed/absolute, used by 72h and 10-day graphs)
-// ============================================================
-const float GRAPH_TEMP_MIN_C = -7.0f;
-const float GRAPH_TEMP_MAX_C = 38.0f;
-const float GRAPH_TEMP_MIN_F = 20.0f;
-const float GRAPH_TEMP_MAX_F = 100.0f;
 
 // ============================================================
 // TEXT HELPERS (OpenFontRender wrappers)
@@ -85,54 +98,6 @@ inline void drawOfrRightString(const String& s, int x, int y, int sz, uint16_t c
 }
 
 // ============================================================
-// PRESET TABLES (locations, weather models, WiFi)
-// ============================================================
-struct LocationPreset {
-    const char* name;
-    float lat;
-    float lon;
-    const char* tz;         // URL-encoded timezone for API
-    const char* posixTz;    // POSIX TZ string for local clock
-};
-
-const LocationPreset LOCATIONS[] = {
-    {"Mariabrunn, Vienna", 48.20695487974676, 16.22939762373813, "Europe%2FVienna",   "CET-1CEST,M3.5.0,M10.5.0/3"},
-    {"Graz, Austria",      47.07083,          15.43861,           "Europe%2FVienna",   "CET-1CEST,M3.5.0,M10.5.0/3"},
-    {"Paris, France",      48.85661,          2.35222,            "Europe%2FParis" ,   "CET-1CEST,M3.5.0,M10.5.0/3"},
-    {"Berlin, Germany",    52.52000,          13.40500,           "Europe%2FBerlin",   "CET-1CEST,M3.5.0,M10.5.0/3"},
-    {"Nuuk, Greenland",    64.17451,          -51.73844,          "America%2FNuuk",    "WGT2WGST,M3.5.0,M10.5.0/3"},
-    {"Bangkok, Thailand",  13.75633,          100.50177,          "Asia%2FBangkok",    "ICT-7"},
-    {"New York, USA",      40.71280,          -74.0060,           "America%2FNew_York","EST5EDT,M3.2.0,M11.1.0"}
-};
-const int NUM_LOCATIONS = sizeof(LOCATIONS) / sizeof(LOCATIONS[0]);
-
-const char* WEATHER_MODELS[] = {
-    "best_match", "icon_seamless", "geosphere_seamless", "ecmwf_ifs04", "gfs_seamless"
-};
-const int NUM_MODELS = sizeof(WEATHER_MODELS) / sizeof(WEATHER_MODELS[0]);
-
-struct WifiCredential { const char* ssid; const char* password; };
-
-const WifiCredential WIFI_PRESETS[] = {  // ****** Enter SSID and Password of up to 3 WIFI Networks ******
-    {"YOUR_SSID",   "YOUR_PASSWORD"},
-    {"YOUR_SSID_2", "YOUR_PASSWORD_2"},
-    {"YOUR_SSID_3", "YOUR_PASSWORD_3"}
-};
-const int NUM_WIFI = sizeof(WIFI_PRESETS) / sizeof(WIFI_PRESETS[0]);
-
-enum UnitSystem { UNIT_METRIC, UNIT_IMPERIAL };
-
-// ============================================================
-// ACTIVE SETTINGS
-// ============================================================
-int activeLocationIdx = 0;
-int activeModelIdx    = 0;
-int activeWifiIdx     = 0;
-UnitSystem activeUnit = UNIT_METRIC;
-
-const char* ntpServer = "pool.ntp.org";
-
-// ============================================================
 // WEATHER DATA
 // ============================================================
 struct CurrentWeather {
@@ -146,7 +111,7 @@ struct CurrentWeather {
     String sunset;    // "HH:MM"
 };
 
-struct HourlyPoint { float temp; float precip; int code; };
+struct HourlyPoint { float temp; float precip; float windSpeed; int code; };
 struct DailyPoint  { float tempMax; float tempMin; float precipSum; int code; };
 
 CurrentWeather currentWeather;
@@ -166,12 +131,28 @@ enum ScreenState {
     SCREEN_10DAY_DAILY,   // rotating screen 4
     SCREEN_SETTINGS
 };
-const int ROTATING_SCREEN_COUNT = 4;
 ScreenState currentScreen = SCREEN_CURRENT;
 
 unsigned long lastFetchTime = 0;
-const unsigned long fetchInterval = 10 * 60 * 1000;   // 10 minutes
+unsigned long lastSuccessTime = 0;
+unsigned long lastWifiAttempt = 0;
+bool fetchFailed = false;
+bool weatherFetchPending = false;
 unsigned long lastTouchTime = 0;
+
+// WiFi preset attempts are advanced in loop() so touch remains responsive.
+static const unsigned long WIFI_CONNECT_TIMEOUT = 12000UL;
+int wifiCycleOffset = 0;
+int wifiAttemptIdx = 0;
+String savedWifiSsid;
+String savedWifiPassword;
+bool savedWifiAvailable = false;
+bool savedWifiAttempted = false;
+bool wifiAttemptUsesSaved = false;
+bool wifiAttemptActive = false;
+bool wifiFailureTransitionPending = false;
+unsigned long wifiFailureTransitionAt = 0;
+unsigned long wifiNextRetryAt = 0;
 
 // Forward declarations
 void drawWeatherIcon(int x, int y, int size, int wmoCode, bool isNight = false);
@@ -250,10 +231,11 @@ void loadSettings() {
         Serial.println("BOOT: preferences open failed; keeping defaults");
         return;
     }
-    activeLocationIdx = preferences.getInt("locIdx",   0);
-    activeModelIdx    = preferences.getInt("modelIdx", 0);
-    activeWifiIdx     = preferences.getInt("wifiIdx",  0);
-    activeUnit        = (UnitSystem)preferences.getInt("unitSys", (int)UNIT_METRIC);
+    activeLocationIdx = preferences.getInt("locIdx",   DEFAULT_LOCATION_IDX);
+    activeModelIdx    = preferences.getInt("modelIdx", DEFAULT_MODEL_IDX);
+    activeWifiIdx     = preferences.getInt("wifiIdx",  DEFAULT_WIFI_IDX);
+    if (activeWifiIdx < 0 || activeWifiIdx >= NUM_WIFI) activeWifiIdx = DEFAULT_WIFI_IDX;
+    activeUnit        = (UnitSystem)preferences.getInt("unitSys", (int)DEFAULT_UNIT);
     preferences.end();
 }
 
@@ -438,7 +420,7 @@ bool fetchWeatherData() {
 
     HTTPClient http;
     String unitParams = (activeUnit == UNIT_IMPERIAL)
-        ? "&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch"
+        ? "&temperature_unit=fahrenheit&precipitation_unit=inch"
         : "";
 
     // Build Open-Meteo request URL
@@ -447,10 +429,10 @@ bool fetchWeatherData() {
                  "&longitude=" + String(LOCATIONS[activeLocationIdx].lon, 4) +
                  "&models="   + String(WEATHER_MODELS[activeModelIdx]) +
                  "&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,wind_direction_10m,pressure_msl"
-                 "&hourly=temperature_2m,precipitation,weather_code"
+                 "&hourly=temperature_2m,precipitation,weather_code,wind_speed_10m"
                  "&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,weather_code,sunrise,sunset"
                  "&forecast_days=10&timezone=" + String(LOCATIONS[activeLocationIdx].tz) +
-                 unitParams;
+                 "&wind_speed_unit=kmh" + unitParams;
 
     http.begin(url);
     http.setTimeout(10000);
@@ -477,6 +459,7 @@ bool fetchWeatherData() {
     currentWeather.temp          = doc["current"]["temperature_2m"];
     currentWeather.humidity      = doc["current"]["relative_humidity_2m"];
     currentWeather.windSpeed     = doc["current"]["wind_speed_10m"];
+    if (activeUnit == UNIT_IMPERIAL) currentWeather.windSpeed *= 0.621371f;
     currentWeather.windDirection = doc["current"]["wind_direction_10m"];
     currentWeather.weatherCode   = doc["current"]["weather_code"];
     currentWeather.pressure      = doc["current"]["pressure_msl"];
@@ -487,16 +470,19 @@ bool fetchWeatherData() {
     const char* ssStr = doc["daily"]["sunset"][0];
     currentWeather.sunset  = (ssStr && strlen(ssStr) >= 16) ? String(ssStr).substring(11, 16) : "--:--";
 
-    // --- Hourly data (bounded by all three array sizes) ---
+    // --- Hourly data (bounded by all four array sizes) ---
     JsonArray hTemp   = doc["hourly"]["temperature_2m"];
     JsonArray hPrecip = doc["hourly"]["precipitation"];
     JsonArray hCode   = doc["hourly"]["weather_code"];
+    JsonArray hWind   = doc["hourly"]["wind_speed_10m"];
 
-    hourlyCount = min({(int)hTemp.size(), (int)hPrecip.size(), (int)hCode.size(), 120});
+    hourlyCount = min({(int)hTemp.size(), (int)hPrecip.size(), (int)hCode.size(),
+                       (int)hWind.size(), 120});
     for (int i = 0; i < hourlyCount; i++) {
-        hourlyForecast[i].temp   = hTemp[i];
-        hourlyForecast[i].precip = hPrecip[i];
-        hourlyForecast[i].code   = hCode[i];
+        hourlyForecast[i].temp      = hTemp[i];
+        hourlyForecast[i].precip    = hPrecip[i];
+        hourlyForecast[i].windSpeed = hWind[i];
+        hourlyForecast[i].code      = hCode[i];
     }
 
     // --- Daily data ---
@@ -692,7 +678,7 @@ void draw3DayScreen() {
     if (ssMinutes < 0) ssMinutes = 20 * 60;
 
     // X-coordinates for the 72 hourly slots
-    int xPos[72], yPos[72];
+    int xPos[72], yPos[72], windYPos[72];
     for (int i = 0; i < 72; i++)
         xPos[i] = 12 + (int)(i * (456.0 / 71.0));
 
@@ -702,7 +688,7 @@ void draw3DayScreen() {
     for (int i = 0; i < 72; i++) {
         int slotHour = (startHour + i) % 24;
         if (slotHour == 0 && i > 0) {
-            canvas.drawFastVLine(xPos[i], 34, 270, MY_GREY02);
+            canvas.drawFastVLine(xPos[i], 38, 270, MY_GREY02);
             int headerX = (prevMidnightX + xPos[i]) / 2;
             String dName = dayNames[(wday + currentDayOffset) % 7];
             drawOfrCenterString(dName, headerX, 35, 24, MY_BLUE04);
@@ -726,31 +712,40 @@ void draw3DayScreen() {
 
         drawWeatherIcon(xPos[i] - 23, 60, 50, hourlyForecast[forecastIdx].code, slotIsNight);
 
-        char hBuf[3];
-        sprintf(hBuf, "%02d", slotHour);
-        drawOfrCenterString(hBuf, xPos[i], 100, 20, MY_LIGHTGREY);
+        // char hBuf[3];   // 6-hourly labels
+        // sprintf(hBuf, "%02d", slotHour);
+        // drawOfrCenterString(hBuf, xPos[i], 100, 20, MY_LIGHTGREY);
     }
 
     // Temperature graph (fixed absolute scale)
     float minT = (activeUnit == UNIT_METRIC) ? GRAPH_TEMP_MIN_C : GRAPH_TEMP_MIN_F;
     float maxT = (activeUnit == UNIT_METRIC) ? GRAPH_TEMP_MAX_C : GRAPH_TEMP_MAX_F;
 
-    const int graphTop = 145, graphBottom = 320;
+    const int graphTop = 105, graphBottom = 320;
     const int graphHeight = graphBottom - graphTop;
     const int precipBaseY = 320, precipMaxH = 180;
     float maxExpectedPrecip = (activeUnit == UNIT_IMPERIAL) ? 1.9685f : 50.0f;
 
-    canvas.drawFastHLine(12, graphBottom, 456, MY_GREY02);
+    //canvas.drawFastHLine(12, graphTop, 456, MY_GREY02);
 
     for (int i = 0; i < 72; i++) {
         int forecastIdx = min(startHour + i, hourlyCount - 1);
         if (forecastIdx < 0) forecastIdx = 0;
         float clamped = constrain(hourlyForecast[forecastIdx].temp, minT, maxT);
         yPos[i] = graphBottom - (int)(((clamped - minT) / (maxT - minT)) * graphHeight);
+
+        float windClamped = constrain(hourlyForecast[forecastIdx].windSpeed, 0.0f, GRAPH_WIND_MAX_KM);
+        windYPos[i] = graphBottom - (int)((windClamped / GRAPH_WIND_MAX_KM) * graphHeight);
     }
 
+    // Wind curve on the same graph area; fixed 0-100 km/h scale.
+    drawSplineGraphFilled(xPos, windYPos, 72, MY_GREY03, MY_BLACK, precipBaseY);
+    drawOfrString("Temp (°C/F)", 9, 105, 14, MY_YELLOW);
+    drawOfrString("Wind (0-" + String(GRAPH_WIND_MAX_KM, 0) + " km/h)", 9, 122, 14, MY_LIGHTGREY);
+
     // Yellow filled temperature curve
-    drawSplineGraphFilled(xPos, yPos, 72, MY_YELLOW, 0x0001, precipBaseY);
+    drawSplineGraphFilled(xPos, yPos, 72, MY_YELLOW, MY_BLACK, precipBaseY);
+ 
 
     // 6-hour precipitation bars
     for (int i = 0; i < 72; i += 6) {
@@ -866,6 +861,9 @@ void draw10DayScreen() {
     drawSplineGraphFilled(maxXPts, maxYPts, dailyCount, MY_YELLOW, MY_GREY, precipBaseY);
     drawSplineGraphFilled(minXPts, minYPts, dailyCount, MY_BLUE04, 0x0001, precipBaseY);
 
+    drawOfrString("Temp (°C/F max)", 9, 95, 14, MY_YELLOW);
+    drawOfrString("Temp (°C/F min)", 9, 113, 14, MY_BLUE04);
+
     // Per-day precipitation bars + min/max labels
     for (int i = 0; i < dailyCount; i++) {
         int xCenter = maxXPts[i];
@@ -907,10 +905,115 @@ void drawSettingsScreen() {
     canvas.drawFastHLine(15, 230, 450, MY_GREY02);
 
     // Save button
-    canvas.fillRoundRect(30, 252, 420, 50, 8, MY_BLUE);
-    drawOfrCenterString("< SAVE & RECONNECT", 240, 262, 24, MY_WHITE, MY_BLUE);
+    canvas.fillRoundRect(30, 244, 420, 50, 8, MY_BLUE);
+    drawOfrCenterString("< SAVE & RECONNECT", 240, 254, 22, MY_WHITE, MY_BLUE);
+
+    // ElegantOTA endpoint (same information as the CYD settings screen).
+    drawOfrCenterString("Holo9 Weather © HN 2026 - IP: " + WiFi.localIP().toString(), 240, 300, 14, MY_GREY03, MY_GREY);
 
     pushCanvas();
+}
+
+// Start one preset. Subsequent presets are attempted by serviceWiFiConnection().
+void beginWifiPresetAttempt(int presetIdx) {
+    wifiAttemptIdx = presetIdx;
+    wifiAttemptUsesSaved = false;
+    wifiAttemptActive = true;
+    lastWifiAttempt = millis();
+    Serial.printf("Attempting WiFi SSID: %s (Index: %d)\n",
+                  WIFI_PRESETS[wifiAttemptIdx].ssid, wifiAttemptIdx);
+    WiFi.disconnect();
+    WiFi.begin(WIFI_PRESETS[wifiAttemptIdx].ssid, WIFI_PRESETS[wifiAttemptIdx].password);
+}
+
+void beginSavedWifiAttempt() {
+    wifiAttemptUsesSaved = true;
+    wifiAttemptActive = true;
+    lastWifiAttempt = millis();
+    Serial.printf("Attempting previously saved WiFi SSID: %s\n", savedWifiSsid.c_str());
+    WiFi.disconnect();
+    WiFi.begin(savedWifiSsid.c_str(), savedWifiPassword.c_str());
+}
+
+void beginWifiPresetCycle() {
+    wifiCycleOffset = 0;
+    savedWifiAttempted = false;
+    wifiFailureTransitionPending = false;
+    beginWifiPresetAttempt(activeWifiIdx);
+}
+
+void serviceWiFiConnection() {
+    unsigned long now = millis();
+
+    if (wifiFailureTransitionPending && now - wifiFailureTransitionAt >= 1800UL) {
+        wifiFailureTransitionPending = false;
+        currentScreen = SCREEN_SETTINGS;
+        drawSettingsScreen();
+    }
+
+    if (wifiAttemptActive) {
+        if (WiFi.status() == WL_CONNECTED) {
+            wifiAttemptActive = false;
+            if (!wifiAttemptUsesSaved && activeWifiIdx != wifiAttemptIdx) {
+                activeWifiIdx = wifiAttemptIdx;
+                saveSettings();
+            }
+            Serial.print("WiFi Connected! IP: ");
+            Serial.println(WiFi.localIP());
+            startOTAServer();
+            configTzTime(LOCATIONS[activeLocationIdx].posixTz, ntpServer);
+            weatherFetchPending = true;
+            lastWifiAttempt = now;
+            return;
+        }
+
+        if (now - lastWifiAttempt >= WIFI_CONNECT_TIMEOUT) {
+            wifiAttemptActive = false;
+            ++wifiCycleOffset;
+            if (wifiCycleOffset < NUM_WIFI) {
+                beginWifiPresetAttempt((activeWifiIdx + wifiCycleOffset) % NUM_WIFI);
+            } else if (savedWifiAvailable && !savedWifiAttempted) {
+                savedWifiAttempted = true;
+                beginSavedWifiAttempt();
+            } else {
+                Serial.printf("All %d WiFi presets and saved credentials failed. Status Code: %d\n",
+                              NUM_WIFI, WiFi.status());
+                fetchFailed = true;
+                wifiNextRetryAt = now + wifiRetryInterval;
+                canvas.fillSprite(MY_BLACK);
+                drawOfrCenterString("WiFi Connection Failed!", 240, 140, 32, MY_RED);
+                pushCanvas();
+                wifiFailureTransitionPending = true;
+                wifiFailureTransitionAt = now;
+            }
+        }
+    } else if (!wifiFailureTransitionPending && WiFi.status() != WL_CONNECTED &&
+               (wifiNextRetryAt == 0 || (long)(now - wifiNextRetryAt) >= 0)) {
+        // Retry the full preset list periodically after startup or link failure.
+        wifiNextRetryAt = 0;
+        beginWifiPresetCycle();
+    }
+}
+
+void applyBrightness(int level) {
+    int b = constrain(level, 1, 10);
+    uint8_t duty = (b * b * 255) / 100;
+#if ESP_ARDUINO_VERSION_MAJOR >= 3
+    ledcWrite(LCD_BL, duty);
+#else
+    ledcWrite(0, duty);
+#endif
+}
+
+int currentTargetBrightness(int hour) {
+    if (!NIGHT_DIM_ENABLED) return SCREEN_BRIGHTNESS;
+    bool night;
+    if (NIGHT_START_HOUR > NIGHT_END_HOUR) {
+        night = (hour >= NIGHT_START_HOUR || hour < NIGHT_END_HOUR);
+    } else {
+        night = (hour >= NIGHT_START_HOUR && hour < NIGHT_END_HOUR);
+    }
+    return night ? NIGHT_BRIGHTNESS : SCREEN_BRIGHTNESS;
 }
 
 // ============================================================
@@ -923,8 +1026,15 @@ void setup() {
     updateSystemTimezone();
 
     // --- Display ---
-    pinMode(LCD_BL, OUTPUT);
-    digitalWrite(LCD_BL, HIGH);
+    // Backlight PWM (brightness 0-10 from presets)
+#if ESP_ARDUINO_VERSION_MAJOR >= 3
+    ledcAttach(LCD_BL, 5000, 8);      // pin, 5 kHz, 8-bit
+#else
+    ledcSetup(0, 5000, 8);            // channel 0, 5 kHz, 8-bit
+    ledcAttachPin(LCD_BL, 0);
+#endif
+    applyBrightness(SCREEN_BRIGHTNESS);
+
     mylcd.Init();
     mylcd.Set_Rotation(1);
 
@@ -950,7 +1060,7 @@ void setup() {
     canvas.drawSmoothArc(240, 220, 50, 46, 140, 220, MY_BLUE02, true);
     canvas.drawSmoothArc(240, 220, 64, 60, 140, 220, MY_BLUE,   true);
 
-    drawOfrCenterString("Holo9 Weather V2.0 (c) HN 2026", 240, 280, 18, MY_GREY03);
+    drawOfrCenterString("Holo9 Weather V2.23 © HN 2026", 240, 280, 18, MY_GREY03);
     pushCanvas();
 
     // --- Touch ---
@@ -959,58 +1069,38 @@ void setup() {
 
     // --- WiFi ---
     WiFi.mode(WIFI_STA);
+    // Preserve ESP32-saved credentials before preset attempts change station config.
+    savedWifiSsid = WiFi.SSID();
+    savedWifiPassword = WiFi.psk();
+    savedWifiAvailable = savedWifiSsid.length() > 0;
     WiFi.disconnect();
-    delay(100);
-
-    Serial.printf("Attempting WiFi Connection to SSID: %s (Index: %d)\n",
-                  WIFI_PRESETS[activeWifiIdx].ssid, activeWifiIdx);
-    WiFi.begin(WIFI_PRESETS[activeWifiIdx].ssid, WIFI_PRESETS[activeWifiIdx].password);
-
-    int attempts = 0;
-    while (WiFi.status() != WL_CONNECTED && attempts < 30) {
-        delay(500);
-        Serial.print(".");
-        attempts++;
-    }
-    Serial.println();
-
-    // --- First fetch / error screen ---
-    if (WiFi.status() == WL_CONNECTED) {
-        Serial.print("WiFi Connected! IP: ");
-        Serial.println(WiFi.localIP());
-        configTzTime(LOCATIONS[activeLocationIdx].posixTz, ntpServer);
-
-        struct tm timeinfo;
-        bool timeReady = getLocalTime(&timeinfo, 10000);  // wait up to 10 seconds
-
-        Serial.println(timeReady ? "NTP time is ready" : "NTP timed out; will retry");
-
-        if (fetchWeatherData()) {
-            lastFetchTime = millis();
-            drawCurrentScreen();
-        } else {
-            canvas.fillSprite(MY_BLACK);
-            drawOfrCenterString("API Fetch Failed!", 240, 140, 32, MY_RED);
-            pushCanvas();
-        }
-    } else {
-        Serial.printf("WiFi Connection Failed. Status Code: %d\n", WiFi.status());
-        canvas.fillSprite(MY_BLACK);
-        drawOfrCenterString("WiFi Connection Failed!", 240, 140, 32, MY_RED);
-        pushCanvas();
-    }
+    fetchFailed = true;
+    weatherFetchPending = true;
+    beginWifiPresetCycle();
 }
 
 // ============================================================
 // MAIN LOOP
 // ============================================================
 void loop() {
+    serviceWiFiConnection();
+
+    // Start after a later WiFi reconnect as well as the initial connection.
+    startOTAServer();
+
+    // Keep the OTA web server responsive without blocking the weather UI.
+    if (otaServerStarted) {
+        server.handleClient();
+        ElegantOTA.loop();
+    }
+
     // 1) Tick the header clock once per minute
     static int lastMinute = -1;
     struct tm timeinfo;
     if (currentScreen != SCREEN_SETTINGS && getLocalTime(&timeinfo)) {
         if (timeinfo.tm_min != lastMinute) {
             lastMinute = timeinfo.tm_min;
+            applyBrightness(currentTargetBrightness(timeinfo.tm_hour));
 
             if (currentScreen == SCREEN_SENSE_CLOCK) {
                 drawSenseClockTime(timeinfo);
@@ -1023,13 +1113,24 @@ void loop() {
                 drawOfrRightString(timeStr, 468, 6, 22, MY_WHITE);
                 pushCanvas();
             }
+            bool stale = (lastSuccessTime == 0) || (millis() - lastSuccessTime > staleThreshold);
+            if (stale && currentScreen != SCREEN_SENSE_CLOCK) {
+                canvas.fillCircle(388, 17, 5, MY_RED);
+                pushCanvas();
+            }
         }
     }
 
-    // 2) Periodic refresh (every 10 minutes)
-    if (millis() - lastFetchTime > fetchInterval) {
+    // 2) Periodic refresh (every 10 minutes), or after WiFi connects.
+    unsigned long wait = fetchFailed ? retryInterval : fetchInterval;
+    if (WiFi.status() == WL_CONNECTED &&
+        (weatherFetchPending || millis() - lastFetchTime > wait)) {
         lastFetchTime = millis();
         if (fetchWeatherData()) {
+            weatherFetchPending = false;
+            fetchFailed = false;
+            lastSuccessTime = millis();
+            if (lastSuccessTime == 0) lastSuccessTime = 1;
             switch (currentScreen) {
                 case SCREEN_CURRENT:     drawCurrentScreen();     break;
                 case SCREEN_SENSE_CLOCK: drawSenseClockScreen(); break;
@@ -1037,6 +1138,10 @@ void loop() {
                 case SCREEN_10DAY_DAILY: draw10DayScreen();   break;
                 default: break;
             }
+        } else {
+            weatherFetchPending = false;
+            fetchFailed = true;
+            Serial.println("Fetch failed, retrying soon");
         }
     }
 
@@ -1060,20 +1165,28 @@ void loop() {
                 drawOfrCenterString("Updating Settings...", 240, 140, 32, MY_WHITE);
                 pushCanvas();
 
-                // Reconnect if the WiFi preset changed
-                if (WiFi.SSID() != WIFI_PRESETS[activeWifiIdx].ssid) {
-                    WiFi.disconnect();
-                    WiFi.begin(WIFI_PRESETS[activeWifiIdx].ssid, WIFI_PRESETS[activeWifiIdx].password);
-                    int attempts = 0;
-                    while (WiFi.status() != WL_CONNECTED && attempts < 15) {
-                        delay(500);
-                        attempts++;
-                    }
+                // Return to the weather view immediately; reconnect in loop().
+                bool wifiPresetChanged = WiFi.status() != WL_CONNECTED ||
+                                         WiFi.SSID() != WIFI_PRESETS[activeWifiIdx].ssid;
+                currentScreen = SCREEN_CURRENT;
+                if (wifiPresetChanged) {
+                    weatherFetchPending = true;
+                    wifiNextRetryAt = 0;
+                    beginWifiPresetCycle();
+                    canvas.fillSprite(MY_BLACK);
+                    drawOfrCenterString("Connecting WiFi...", 240, 140, 32, MY_WHITE);
+                    pushCanvas();
+                } else {
+                    weatherFetchPending = true;
+                    lastFetchTime = 0;
+                    drawCurrentScreen();
                 }
 
-                fetchWeatherData();
-                currentScreen = SCREEN_CURRENT;
-                drawCurrentScreen();
+                // Consume the save-button touch: wait for release, then restart the debounce
+                while (touch.Get_Touch()) {
+                    delay(10);
+                }
+                lastTouchTime = millis();
             }
         }
         else {
