@@ -3,22 +3,32 @@
 ![Holo9 Weather Display](https://github.com/holo9-code/Holo9-Weather/blob/main/pics/Holo9_3DPrint_800.jpg)
 
 ---
+## 🌤️ In Brief
+
+Holo9 Weather is an internet-connected weather station powered by an  [ESP32-S3 microcontroller with an attached 3.5" QSPI  capacitive touch display](https://link.amazon/B0hpUn6v9) in an (optional) stylish printed enclosure that sits on your desk or wall.
+
+It features
+- 4 + 1 Screens (current weather, weather clock, 72h forecast, 10-day forecast + settings)
+- Free access to Open-Meteo's global weather API (no registration) with multiple prediction models to chose from
+- Everything operated from touch screen (no soldering or external buttons)
+- Settings screen for location, prediction model, WiFi, and metric/imperial unit selection
+- Additional settings in a separate presets file (e.g. temp ranges, nighttime dimming etc.)
+- OTA updates or flash code via Arduino IDE
+- STL files included for 3D-printing the enclosure
 
 ## 🌤️ What is Holo9 Weather?
 
-Holo9 Weather is a simple, internet-connected weather station powered by an ESP32-S3 microcontroller with an attached 3.5" QSPI  capacitive touch display. It fetches weather forecasts from Open-Meteo's global weather API and presents them in a stylish, easy-to-read format across four different screens.
-
-Whether you're a weather enthusiast, a maker looking for a practical ESP32 project, or just want a stylish way to check the forecast, Holo9 Weather will give you 4 screens with different information. Rotate through the 4 screens with a simple tap anywhere on the touch screen or the lower right corner to get to the settings menu:
+Holo9 Weather is a simple, internet-connected weather station powered by an ESP32-S3 microcontroller with an attached 3.5" QSPI  capacitive touch display. It fetches weather forecasts from Open-Meteo's global weather API and presents them in a stylish, easy-to-read format across four different screens. Rotate through the 4 screens with a simple tap anywhere on the touch screen or the lower right corner to get to the settings menu:
 
 - **Current conditions** with temperature, humidity, wind, and precipitation
 
   ![Holo9 Weather Display](https://github.com/holo9-code/Holo9-Weather/blob/main/pics/Holo9_Screen1_640.jpg)
 
-- **Sense Clock mode** - a simple clock with today's weather
+- **Sense Clock mode** - a simple clock with basic weather information
 
     ![Holo9 Weather Display](https://github.com/holo9-code/Holo9-Weather/blob/main/pics/Holo9_Screen2_640.jpg)
 
-- **72-hour hourly forecast** showing temperature trends and rain probability over the coming 3 days
+- **72-hour hourly forecast** showing temperature trends and precipitation over the coming 3 days
 
     ![Holo9 Weather Display](https://github.com/holo9-code/Holo9-Weather/blob/main/pics/Holo9_Screen3_640.jpg)
 
@@ -30,7 +40,7 @@ Whether you're a weather enthusiast, a maker looking for a practical ESP32 proje
 
     ![Holo9 Weather Display](https://github.com/holo9-code/Holo9-Weather/blob/main/pics/Holo9_ScreenSett_640.jpg)
 
-I tried to keep the interface simple, intuitive, and visually appealing, with smooth vector graphics using the full 320*480 resolution and a dark theme that's easy on the eyes.
+I tried to keep the interface simple, intuitive, and visually appealing, with smooth vector graphics using as much of the full 320*480 resolution as possible and a dark theme that's easy on the eyes.
 
 ---
 
@@ -46,7 +56,7 @@ Essentially this is a one item shopping list:
 
   This is a roughly USD/EUR 25 development board sold under a number of different brand names (Elecrow, Hosyond...). Why this one? This is essentially a CYD on steroids for just a few bucks more, still ultra compact but much better and slightly bigger screen, QSPI display with capacitive touch and a modern ST77922 controller, way more RAM, more power... 
 
-  Make sure you get the 3.5" (not 2.8") version. It is a black (unlike CYDs) development board. Look out for the "3.5" LCD Display ESP32-S3 320x480 Capacitive Touch" label on its back. I found it on the US Amazon website as "Hosyond ESP32-S3 Touchscreen Module, 3.5" 240x320 IPS LCD EPS32 Display", which is simply wrong (as it is 320x480) but should nevertheless be the one you are looking for.
+  Make sure you get the 3.5" (not 2.8") version. It is a black (unlike CYDs) development board. Look out for the "3.5" LCD Display ESP32-S3 320x480 Capacitive Touch" label on its back. I found it on the US Amazon website as "Hosyond ESP32-S3 Touchscreen Module, 3.5" 240x320 IPS LCD EPS32 Display", which is obviously a typo (as it is 320x480) but should nevertheless be the one you are looking for (remember, take a look at the back).
 
   
 
@@ -54,7 +64,7 @@ Essentially this is a one item shopping list:
 
   
 
-  It comes with a built in SD-card reader, microphone, external speaker (which we all won`t be using) and an USB-A to USB-C cable (which WILL be using), built in Wifi and BT and battery charging circuit (nice if you want to add a battery)
+  It comes with a built in SD-card reader, microphone, external speaker (which we all won`t be using) and an USB-A to USB-C cable (which we WILL be using), built in Wifi and BT and battery charging circuit (nice if you want to add a battery - I tried, it runs on a fully charged 3000mAh battery pack for around 24h)
 
   ![Holo9 Weather Display](https://github.com/holo9-code/Holo9-Weather/blob/main/pics/ESP32S3with35Display_640.jpg)
 
@@ -86,22 +96,19 @@ Here the full specs, documentation, pinout etc:  https://www.lcdwiki.com/3.5inch
 
 ### Adressing that ST77922 Screen:
 
-If you have been playing around with the ESP32 (e.g. with the CYD) things like TFT_eSPI.h (Thx to Bodmer for this wonderful lib) will instantly look familiar. However, since this board is using a modern QSPI interface and an ST77922 screen, which are not supported, you can`t directly write to the screen. Instead you write to an off-screen frame buffer (TFT_eSprite canvas) and then push the sprite buffer to the physical QSPI display using the provided ST77922 driver. Sounds slightly complicated (and took me some time to find out) but ultimately a very simple concept, which allows you to use the full power of theTFT_eSPI library.
+If you have been playing around with the ESP32 (e.g. with the CYD) things like TFT_eSPI.h (Thx to Bodmer for this wonderful lib) will instantly look familiar. However, since this board is using a modern QSPI interface and an ST77922 screen, which are not supported, you can`t directly write to the screen. Instead you write to an off-screen frame buffer (TFT_eSprite canvas) and then push the sprite buffer to the physical QSPI display using the provided ST77922 driver. Sounds slightly complicated (and took me some time to find out) but ultimately a very simple concept, which allows you to use the full power of the TFT_eSPI library.
 
 #### A Few More Components:
 
 - **Open-Meteo API Integration**: Fetches weather data from [open-meteo.com](https://open-meteo.com) in Switzerland, a free weather API that provides global forecast data and multiple models
-- **Fonts**: Uses OpenFontRender for scalable text rendering
+- **Fonts**: Uses OpenFontRender (Copyright (c) takkaO FTL License) for scalable text rendering
 - **Custom Display Drivers**: ST77922 driver for the QSPI display and ST77922_Touch for capacitive touch. Very basic drivers essentially just used to push the data from the frame-buffer to the screen
 - **Preferences System**: Persistent storage of settings using the ESP32's Preferences library
-
-#### Weather Data Structure:
-
-The code fetches and stores:
-
-- **Current conditions**: Temperature, humidity, wind speed/direction, pressure, sunrise/sunset times
-- **Hourly forecast**: 120 hours of temperature, precipitation, and weather codes
-- **Daily forecast**: 10 days of high/low temperatures, precipitation, and weather codes
+- **OTA Updates**: Using ElegantOTA (Copyright Ayush Sharma 2026 AGPL-3.0 License)
+- **Automatic refresh**: Data updates every 10 minutes (can be adjusted in the Presets)
+- **Timezone support**: Automatic timezone adjustment based on location
+- **Unit conversion**: Toggle between metric (°C, km/h, mm) and imperial (°F, mph, in)
+- **Multiple weather models**: Choose from best_match, icon_seamless, geosphere_seamless, ecmwf_ifs04, or gfs_seamless
 
 #### Weather Model Selection (in Settings):
 
@@ -122,15 +129,7 @@ Four rotating screens provide different views. Tap on the screen anywhere outsid
 
 Tap the lower right corner to reach
 
-1. **Settings**: Configuration for location, weather model, units, and WiFi. These are all hard coded in the 
-
-#### Key Features:
-
-- **Automatic refresh**: Data updates every 10 minutes
-- **Timezone support**: Automatic timezone adjustment based on location
-- **Unit conversion**: Toggle between metric (°C, km/h, mm) and imperial (°F, mph, in)
-- **Multiple weather models**: Choose from best_match, icon_seamless, geosphere_seamless, ecmwf_ifs04, or gfs_seamless
-- **Touch navigation**: Simple tap to cycle through screens, no external connections
+1. **Settings**: Configuration for location, weather model, units, and WiFi (these are all hard coded in Holo9Presets.h) 
 
 ---
 
@@ -144,41 +143,21 @@ It should essentially be very simple. Connect your ESP32 board to your computer 
 
 - **Arduino IDE** (2.3.2 or later recommended)
 - **ESP32 Arduino Core** (version 3.0.0 or later)
-
   
-
 #### Arduino IDE Configuration:
 
 1. **Install ESP32 Board Support**:
 
    - Open Arduino IDE
-
    - Go to **File > Preferences**
-
-   - Add this URL to "Additional Boards Manager URLs":
-
-     ```
-     Hardware Setup:
-     **ESP32-S3 board** with 8MB PSRAM and 8MB flash
-     
-     **3.5" ST77922 QSPI display** (the one from [lcdwiki.com](https://www.lcdwiki.com/3.5inch_ESP32-S3_Display))
-     
-     **USB-C cable** for programming and power
-     
-     **WiFi network** (2.4GHz recommended)https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
-     ```
-
+   - Add this URL to "Additional Boards Manager URLs": https://espressif.github.io/arduino-esp32/package_esp32_index.json
    - Go to **Tools > Board > Boards Manager**
-
    - Search for "esp32" and install "esp32 by Espressif Systems"
-
-2. **Select the Correct Board**:
-
    - **Tools > Board > ESP32 Arduino > ESP32S3 Dev Module**
-   - **Tools > Partition Scheme > 8M with spiffs (1.5MB APP, 7.5MB SPIFFS)**
+   - **Tools > Partition Scheme > 8M with spiffs (3MB APP, 1.5MB SPIFFS)**
    - **Tools > PSRAM > OPI PSRAM**
    - **Tools > USB Mode > Hardware CDC and JTAG**
-   - **Tools > Upload Mode > UART**
+   - **Tools > Upload Mode > UART/Hardware CDC**
    - **Tools > Port** (select your COM port)
 
 3. **Install Dependencies**:
@@ -187,29 +166,24 @@ It should essentially be very simple. Connect your ESP32 board to your computer 
    - For custom libraries (ST77922, ST77922_Touch):
      - Place them in your Arduino libraries folder
      - Or use **Sketch > Add .ZIP Library**
-- **Required Libraries** (install via Library Manager or GitHub):
-  - `WiFi` (built-in)
-  - `HTTPClient` (built-in)
-  - `ArduinoJson` (by Benoit Blanchon, version 6.x)
-  - `TFT_eSPI` (by Bodmer, version 2.x)
-  - `Preferences` (built-in)
-  - `OpenFontRender` (by takkaO)
-  - `ST77922` (custom library for your display)
-  - `ST77922_Touch` (custom library for touch interface)
-  - `PlusJakarta` (embedded TTF font - place PlusJakarta.h in the same directory as the code)
+
+    - `WiFi` (built-in)
+    - `HTTPClient` (built-in)
+    - `ArduinoJson` (by Benoit Blanchon, version 6.x)
+    - `TFT_eSPI` (by Bodmer, version 2.x)
+    - `Preferences` (built-in)
+    - `OpenFontRender` (by takkaO)
+    - `ElegantOTA` (for OTA Update)
+    - `ST77922` (custom library for your display, .zip included, use Sketch > Add .ZIP Library to install)
+    - `ST77922_Touch` (custom library for touch interface, .zip included, use Sketch > Add .ZIP Library to install)
+    - `PlusJakarta` (embedded TTF font - place PlusJakarta.h in the same directory as the code)
 
 ### Flashing the Firmware
 
 1. **Download the Code**:
-
-   
-
 2. **Configure WiFi**:
-
    - Open `.ino` in Arduino IDE
-
-   - Edit the `WIFI_PRESETS` array in the code. Most of the time you will just need one, so this is in case you keep moving your ESP:
-
+   - Edit the `WIFI_PRESETS` array in the Holo9Presets.h code. Most of the time you will just need one, so this is in case you keep moving your ESP:
      ```cpp
      const WifiCredential WIFI_PRESETS[] = {
          {"YOUR_SSID", "YOUR_PASSWORD"},
@@ -231,7 +205,7 @@ It should essentially be very simple. Connect your ESP32 board to your computer 
      };
      ```
 
-   - The easiest way to find your exact location is to look it up in Google Maps, then right click and get the location data. To get the full data with timezone and posix string copy one of the locations and ask Google to give you the exact same infor for your location.
+   - The easiest way to find your exact location is to look it up in Google Maps, then right click and get the location data. To get the full data with timezone and posix string copy one of the locations and ask Google to give you the exact same info for your location.
 
      ```cpp
      {"Mariabrunn, Vienna", 48.207, 16.229, "Europe%2FVienna", "CET-1CEST,M3.5.0,M10.5.0/3"}
@@ -248,135 +222,37 @@ It should essentially be very simple. Connect your ESP32 board to your computer 
 
    - The display will show a splash screen while connecting to WiFi
    - After successful connection, weather data will be fetched and displayed
-   - If WiFi connection fails, the device will retry automatically
+   - If WiFi connection fails, the device will retry automatically and/or try one of the other WiFi networks
    - If you get stuck somewhere, check all your data and reflash
    - Tap the lower right corner on any page, choose your location, preferred forecast model, and imperial/metric and click exit. These values will be stored even if you power down.
 
-   ###### Settings:
+6. **Settings** 🛠️:
 
    - **Location**: Choose from predefined cities or add your own coordinates
-   - **Model**: Select weather model (best_match typically gives good results)
-   - **WiFi**: Choose from up to 3 saved WiFi networks
+   - **Model**: Select weather model (best_match typically gives good results, see above for details)
+   - **WiFi**: Choose from up to 3 saved WiFi networks hard-coded in Presets
    - **Units**: Toggle between metric and imperial units
    - Settings will be saved on exit
 
 ---
 
-## 🎛️ Usage & Navigation
-
-### Screen Navigation
-
-Simply **tap the settings icon** in the bottom-right corner to cycle through the five different screens:
-
-1. **Current Weather** (📍 Main dashboard)
-
-   - Current temperature, humidity, wind, and pressure
-   - Today's sunrise and sunset times
-   - Hourly forecast for the next 12 hours
-   - Weather icon representing current conditions
-
-2. **Sense Clock** (⏰ Beautiful clock mode)
-
-   - Large, easy-to-read clock
-   - Current temperature and humidity
-   - Today's precipitation forecast
-   - Location name
-   - Weather icon
-
-3. **72-Hour Forecast** (📈 Temperature trends)
-
-   - Hourly temperature graph for the next 72 hours
-   - Precipitation bars showing rain probability
-   - Weather icons for each 6-hour period
-   - Day/night indicators
-
-4. **10-Day Forecast** (📅 Extended outlook)
-
-   - Daily high/low temperatures
-   - Weather icons for each day
-   - Precipitation amounts
-   - Smooth temperature trend line
-
-5. **Settings** (⚙️ Configuration)
-
-   - Change location, weather model, units, and WiFi
-   - Save settings and reconnect to WiFi
-   - All settings are saved to persistent storage
-
-### 
+##  Tips & Recommendations
 
 ---
 
-## 🛠️ Tips & Recommendations
+## 📜 Licenses and Credits 📚
 
-### Power Options:
-
-- **USB Power**: Use a standard 5V/1A USB power adapter
-- **Battery**: The board has a battery connector (not implemented in current firmware)
-- **Low Power**: For battery operation, you'd need to implement deep sleep modes
-
-### Display Customization:
-
-- The code uses a dark theme with accent colors (blue, yellow, grey)
-- Fonts are embedded as TTF files for crisp rendering
-- Weather icons are vector-based and scale smoothly
-
-### Weather Model Selection:
-
-- **best_match**: Automatically selects the best available model
-- **icon_seamless**: Good for Europe
-- **geosphere_seamless**: High-resolution global model
-- **ecmwf_ifs04**: European Centre for Medium-Range Weather Forecasts
-- **gfs_seamless**: Global Forecast System (US)
-
-
-
-
-
----
-
-## 📜 Licenses and Credits
-
-I greatly appreciate all the hard work done by other people this app is built on.
+Thanks to all the folks who contributed to this project (without knowing):
 
 - Weather data: [Open-Meteo](https://open-meteo.com/) (free for non-commercial use, [attribution required](https://open-meteo.com/en/license))
 - [TFT_eSPI](https://github.com/Bodmer/TFT_eSPI) by Bodmer (FreeBSD)
 - [OpenFontRender](https://github.com/takkaO/OpenFontRender) by takkaO (FTL)
 - [Plus Jakarta Sans](https://github.com/tokotype/PlusJakartaSans) by Tokotype (SIL OFL)
+- [ElegantOTA](https://github.com/ayushsharma82/ElegantOTA) by Ayush Sharma (AGPL 3.0)
 - Holo9 Weather © 2026 Harald Noedl, released under the **MIT License**
 
 ---
 
+**Hope you like it and if you like it please like ❤️ it!**
 
 
----
-
-## 📸 Gallery
-
-![Sense Clock Screen](https://github.com/yourusername/Holo9_Weather/blob/main/screenshots/sense_clock.jpg?raw=true)
-*Beautiful clock mode showing current weather*
-
-![72-Hour Forecast](https://github.com/yourusername/Holo9_Weather/blob/main/screenshots/72hr_forecast.jpg?raw=true)
-*Detailed hourly forecast with temperature trends*
-
-![10-Day Forecast](https://github.com/yourusername/Holo9_Weather/blob/main/screenshots/10day_forecast.jpg?raw=true)
-*Extended outlook with daily highs and lows*
-
-![Settings Screen](https://github.com/yourusername/Holo9_Weather/blob/main/screenshots/settings.jpg?raw=true)
-*Easy configuration interface*
-
----
-
-## 📚 Resources
-
-- [ESP32-S3 Datasheet](https://www.espressif.com/sites/default/files/documentation/esp32-s3_datasheet_en.pdf)
-- [Open-Meteo Weather API](https://open-meteo.com)
-- [ST77922 Display Datasheet](https://www.lcdwiki.com/3.5inch_ESP32-S3_Display)
-- [Arduino-ESP32 Documentation](https://docs.espressif.com/projects/arduino-esp32/en/latest/)
-- [TFT_eSPI Library](https://github.com/Bodmer/TFT_eSPI)
-
----
-
-**Built with ❤️ by makers, for makers**
-
-Enjoy your Holo9 Weather station! May it bring you beautiful forecasts and happy making. 🌦️✨
